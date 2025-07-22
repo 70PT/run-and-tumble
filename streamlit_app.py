@@ -15,41 +15,49 @@ def bacteria_animation():
         <style>
             body {
                 margin: 0;
-                padding: 20px;
+                padding: 10px;
                 background: linear-gradient(135deg, #0f0f23, #1a1a3a);
                 color: white;
                 font-family: 'Arial', sans-serif;
+                box-sizing: border-box;
             }
             
             .container {
                 display: flex;
                 flex-direction: column;
                 align-items: center;
+                width: 100%;
+                max-width: 100vw;
             }
             
             .title {
-                font-size: 24px;
+                font-size: clamp(18px, 4vw, 24px);
                 font-weight: bold;
                 margin-bottom: 10px;
                 background: linear-gradient(45deg, #00ff88, #00ccff);
                 -webkit-background-clip: text;
                 -webkit-text-fill-color: transparent;
                 text-align: center;
+                line-height: 1.2;
             }
             
             .description {
-                font-size: 14px;
-                margin-bottom: 20px;
+                font-size: clamp(12px, 3vw, 14px);
+                margin-bottom: 15px;
                 text-align: center;
                 opacity: 0.8;
-                max-width: 600px;
+                max-width: 95%;
+                line-height: 1.4;
             }
             
-            canvas {
+            #canvas {
                 border: 2px solid #333;
                 border-radius: 10px;
                 background: radial-gradient(circle at center, #001122, #000000);
                 box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
+                max-width: 95vw;
+                height: auto;
+                display: block;
             }
             
             .controls {
@@ -57,40 +65,81 @@ def bacteria_animation():
                 display: flex;
                 gap: 15px;
                 align-items: center;
+                justify-content: center;
+                width: 100%;
             }
             
             button {
-                padding: 8px 16px;
+                padding: 10px 20px;
                 background: linear-gradient(45deg, #00ff88, #00ccff);
                 border: none;
-                border-radius: 5px;
+                border-radius: 8px;
                 color: #000;
                 font-weight: bold;
                 cursor: pointer;
                 transition: transform 0.2s;
+                font-size: clamp(14px, 3.5vw, 16px);
+                min-height: 44px; /* iOS touch target minimum */
+                touch-action: manipulation;
             }
             
-            button:hover {
+            button:hover, button:active {
                 transform: scale(1.05);
             }
             
             .legend {
                 margin-top: 15px;
-                display: flex;
-                gap: 20px;
-                font-size: 12px;
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+                gap: 15px;
+                font-size: clamp(11px, 2.5vw, 12px);
+                width: 95%;
+                max-width: 400px;
+                justify-items: center;
             }
             
             .legend-item {
                 display: flex;
                 align-items: center;
-                gap: 5px;
+                gap: 8px;
+                justify-content: center;
             }
             
             .legend-color {
-                width: 12px;
-                height: 12px;
+                width: 14px;
+                height: 14px;
                 border-radius: 50%;
+                flex-shrink: 0;
+            }
+            
+            /* Mobile-specific optimizations */
+            @media (max-width: 768px) {
+                body {
+                    padding: 5px;
+                }
+                
+                .title {
+                    margin-bottom: 8px;
+                }
+                
+                .description {
+                    margin-bottom: 12px;
+                }
+                
+                .controls {
+                    margin-top: 12px;
+                    gap: 12px;
+                }
+                
+                .legend {
+                    margin-top: 12px;
+                    gap: 10px;
+                }
+            }
+            
+            /* Prevent zoom on double-tap */
+            * {
+                touch-action: manipulation;
             }
         </style>
     </head>
@@ -102,7 +151,7 @@ def bacteria_animation():
                 It leaves a red trail as it alternates between straight runs and random tumbles until reaching the food source.
             </p>
             
-            <canvas id="canvas" width="800" height="500"></canvas>
+            <canvas id="canvas"></canvas>
             
             <div class="controls">
                 <button onclick="resetSimulation()">Reset</button>
@@ -128,6 +177,31 @@ def bacteria_animation():
             const canvas = document.getElementById('canvas');
             const ctx = canvas.getContext('2d');
             
+            // Make canvas responsive
+            function resizeCanvas() {
+                const container = canvas.parentElement;
+                const containerWidth = container.clientWidth;
+                const maxWidth = Math.min(containerWidth * 0.95, 800);
+                const aspectRatio = 500 / 800;
+                
+                canvas.width = maxWidth;
+                canvas.height = maxWidth * aspectRatio;
+                canvas.style.width = maxWidth + 'px';
+                canvas.style.height = (maxWidth * aspectRatio) + 'px';
+                
+                // Reinitialize positions based on new canvas size
+                if (bacterium && foodSource) {
+                    bacterium.x = Math.min(bacterium.x, canvas.width - 10);
+                    bacterium.y = Math.min(bacterium.y, canvas.height - 10);
+                    foodSource.x = canvas.width - 50;
+                    foodSource.y = canvas.height - 50;
+                }
+            }
+            
+            // Call on load and resize
+            window.addEventListener('resize', resizeCanvas);
+            window.addEventListener('load', resizeCanvas);
+            
             let bacterium;
             let foodSource;
             let trail = [];
@@ -139,14 +213,14 @@ def bacteria_animation():
                     this.x = x;
                     this.y = y;
                     this.angle = Math.random() * 2 * Math.PI;
-                    this.speed = 2;
+                    this.speed = Math.max(1.5, canvas.width * 0.0025); // Scale speed with canvas size
                     this.state = 'run';
                     this.runTime = 0;
                     this.tumbleTime = 0;
                     this.runDuration = 30 + Math.random() * 40;
                     this.tumbleDuration = 5 + Math.random() * 10;
                     this.lastConcentration = 0;
-                    this.size = 4;
+                    this.size = Math.max(3, canvas.width * 0.005); // Scale size with canvas
                 }
                 
                 update() {
@@ -218,7 +292,7 @@ def bacteria_animation():
                     
                     if (!hasReachedFood) {
                         ctx.strokeStyle = this.state === 'tumble' ? '#8888ff' : '#6666ff';
-                        ctx.lineWidth = 1;
+                        ctx.lineWidth = Math.max(1, canvas.width * 0.001);
                         for (let i = 0; i < 3; i++) {
                             const flagellaAngle = this.angle + Math.PI + (i - 1) * 0.3;
                             const flagellaLength = 8 + Math.sin(Date.now() * 0.01 + i) * 2;
@@ -234,7 +308,7 @@ def bacteria_animation():
                     
                     if (this.state === 'run' && !hasReachedFood) {
                         ctx.strokeStyle = '#ffffff';
-                        ctx.lineWidth = 2;
+                        ctx.lineWidth = Math.max(1.5, canvas.width * 0.002);
                         ctx.beginPath();
                         ctx.moveTo(this.x, this.y);
                         ctx.lineTo(
@@ -263,11 +337,12 @@ def bacteria_animation():
                     ctx.fillStyle = gradient;
                     ctx.fillRect(0, 0, canvas.width, canvas.height);
                     
+                    const foodSize = Math.max(8, canvas.width * 0.015);
                     ctx.fillStyle = '#ffff44';
                     ctx.strokeStyle = '#ffcc00';
-                    ctx.lineWidth = 2;
+                    ctx.lineWidth = Math.max(1.5, canvas.width * 0.002);
                     ctx.beginPath();
-                    ctx.arc(this.x, this.y, 12, 0, 2 * Math.PI);
+                    ctx.arc(this.x, this.y, foodSize, 0, 2 * Math.PI);
                     ctx.fill();
                     ctx.stroke();
                 }
@@ -277,7 +352,7 @@ def bacteria_animation():
                 if (trail.length < 2) return;
                 
                 ctx.strokeStyle = '#ff4444';
-                ctx.lineWidth = 2;
+                ctx.lineWidth = Math.max(1.5, canvas.width * 0.002);
                 ctx.lineCap = 'round';
                 
                 for (let i = 1; i < trail.length; i++) {
@@ -291,8 +366,9 @@ def bacteria_animation():
             }
             
             function initSimulation() {
-                bacterium = new Bacterium(50, 50);
-                foodSource = new FoodSource(canvas.width - 100, canvas.height - 100);
+                resizeCanvas(); // Ensure canvas is properly sized
+                bacterium = new Bacterium(30, 30);
+                foodSource = new FoodSource(canvas.width - 50, canvas.height - 50);
                 trail = [];
                 hasReachedFood = false;
             }
@@ -308,7 +384,7 @@ def bacteria_animation():
                 
                 if (hasReachedFood) {
                     ctx.fillStyle = '#00ff44';
-                    ctx.font = '20px Arial';
+                    ctx.font = `${Math.max(16, canvas.width * 0.025)}px Arial`;
                     ctx.textAlign = 'center';
                     ctx.fillText('Food Source Reached!', canvas.width / 2, 30);
                 }
@@ -320,8 +396,11 @@ def bacteria_animation():
                 initSimulation();
             }
             
-            initSimulation();
-            animate();
+            // Initialize after a short delay to ensure DOM is ready
+            setTimeout(() => {
+                initSimulation();
+                animate();
+            }, 100);
         </script>
     </body>
     </html>
