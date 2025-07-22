@@ -1,151 +1,360 @@
 import streamlit as st
-import pandas as pd
-import math
-from pathlib import Path
+import streamlit.components.v1 as components
 
-# Set the title and favicon that appear in the Browser's tab bar.
-st.set_page_config(
-    page_title='GDP dashboard',
-    page_icon=':earth_americas:', # This is an emoji shortcode. Could be a URL too.
-)
+def bacteria_animation():
+    """Display the bacterial run and tumble animation in Streamlit"""
+    
+    # The HTML code for the animation
+    html_code = """
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Bacterial Run and Tumble Motion</title>
+        <style>
+            body {
+                margin: 0;
+                padding: 20px;
+                background: linear-gradient(135deg, #0f0f23, #1a1a3a);
+                color: white;
+                font-family: 'Arial', sans-serif;
+            }
+            
+            .container {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .title {
+                font-size: 24px;
+                font-weight: bold;
+                margin-bottom: 10px;
+                background: linear-gradient(45deg, #00ff88, #00ccff);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                text-align: center;
+            }
+            
+            .description {
+                font-size: 14px;
+                margin-bottom: 20px;
+                text-align: center;
+                opacity: 0.8;
+                max-width: 600px;
+            }
+            
+            canvas {
+                border: 2px solid #333;
+                border-radius: 10px;
+                background: radial-gradient(circle at center, #001122, #000000);
+                box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
+            }
+            
+            .controls {
+                margin-top: 15px;
+                display: flex;
+                gap: 15px;
+                align-items: center;
+            }
+            
+            button {
+                padding: 8px 16px;
+                background: linear-gradient(45deg, #00ff88, #00ccff);
+                border: none;
+                border-radius: 5px;
+                color: #000;
+                font-weight: bold;
+                cursor: pointer;
+                transition: transform 0.2s;
+            }
+            
+            button:hover {
+                transform: scale(1.05);
+            }
+            
+            .legend {
+                margin-top: 15px;
+                display: flex;
+                gap: 20px;
+                font-size: 12px;
+            }
+            
+            .legend-item {
+                display: flex;
+                align-items: center;
+                gap: 5px;
+            }
+            
+            .legend-color {
+                width: 12px;
+                height: 12px;
+                border-radius: 50%;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1 class="title">Bacterial Run and Tumble Motion</h1>
+            <p class="description">
+                Watch a single bacterium navigate toward food using run and tumble motion. 
+                It leaves a red trail as it alternates between straight runs and random tumbles until reaching the food source.
+            </p>
+            
+            <canvas id="canvas" width="800" height="500"></canvas>
+            
+            <div class="controls">
+                <button onclick="resetSimulation()">Reset</button>
+            </div>
+            
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #4444ff;"></div>
+                    <span>Bacterium</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #ffff44;"></div>
+                    <span>Food Source</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #ff4444;"></div>
+                    <span>Trail</span>
+                </div>
+            </div>
+        </div>
 
-# -----------------------------------------------------------------------------
-# Declare some useful functions.
-
-@st.cache_data
-def get_gdp_data():
-    """Grab GDP data from a CSV file.
-
-    This uses caching to avoid having to read the file every time. If we were
-    reading from an HTTP endpoint instead of a file, it's a good idea to set
-    a maximum age to the cache with the TTL argument: @st.cache_data(ttl='1d')
+        <script>
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            let bacterium;
+            let foodSource;
+            let trail = [];
+            let isRunning = true;
+            let hasReachedFood = false;
+            
+            class Bacterium {
+                constructor(x, y) {
+                    this.x = x;
+                    this.y = y;
+                    this.angle = Math.random() * 2 * Math.PI;
+                    this.speed = 2;
+                    this.state = 'run';
+                    this.runTime = 0;
+                    this.tumbleTime = 0;
+                    this.runDuration = 30 + Math.random() * 40;
+                    this.tumbleDuration = 5 + Math.random() * 10;
+                    this.lastConcentration = 0;
+                    this.size = 4;
+                }
+                
+                update() {
+                    if (hasReachedFood) return;
+                    
+                    trail.push({x: this.x, y: this.y, time: Date.now()});
+                    
+                    const distToFood = Math.sqrt((this.x - foodSource.x) ** 2 + (this.y - foodSource.y) ** 2);
+                    if (distToFood < 15) {
+                        hasReachedFood = true;
+                        return;
+                    }
+                    
+                    const currentConcentration = this.getFoodConcentration();
+                    
+                    if (this.state === 'run') {
+                        this.x += Math.cos(this.angle) * this.speed;
+                        this.y += Math.sin(this.angle) * this.speed;
+                        
+                        this.runTime++;
+                        
+                        let runProbability = 0.95;
+                        if (currentConcentration > this.lastConcentration) {
+                            runProbability = 0.999;
+                        } else if (currentConcentration < this.lastConcentration) {
+                            runProbability = 0.85;
+                        }
+                        
+                        if (this.runTime > this.runDuration || Math.random() > runProbability) {
+                            this.state = 'tumble';
+                            this.runTime = 0;
+                            this.tumbleDuration = 5 + Math.random() * 10;
+                        }
+                    } else {
+                        this.angle += (Math.random() - 0.5) * 0.8;
+                        this.tumbleTime++;
+                        
+                        if (this.tumbleTime > this.tumbleDuration) {
+                            this.state = 'run';
+                            this.tumbleTime = 0;
+                            this.runDuration = 30 + Math.random() * 40;
+                        }
+                    }
+                    
+                    this.lastConcentration = currentConcentration;
+                    
+                    if (this.x < 10 || this.x > canvas.width - 10 || this.y < 10 || this.y > canvas.height - 10) {
+                        this.angle += Math.PI + (Math.random() - 0.5) * 0.5;
+                        this.x = Math.max(10, Math.min(canvas.width - 10, this.x));
+                        this.y = Math.max(10, Math.min(canvas.height - 10, this.y));
+                    }
+                }
+                
+                getFoodConcentration() {
+                    const dist = Math.sqrt((this.x - foodSource.x) ** 2 + (this.y - foodSource.y) ** 2);
+                    return 100 / (1 + dist * 0.01);
+                }
+                
+                draw() {
+                    if (hasReachedFood) {
+                        ctx.fillStyle = '#00ff44';
+                    } else {
+                        ctx.fillStyle = this.state === 'run' ? '#4444ff' : '#6666ff';
+                    }
+                    
+                    ctx.beginPath();
+                    ctx.ellipse(this.x, this.y, this.size, this.size * 1.5, this.angle, 0, 2 * Math.PI);
+                    ctx.fill();
+                    
+                    if (!hasReachedFood) {
+                        ctx.strokeStyle = this.state === 'tumble' ? '#8888ff' : '#6666ff';
+                        ctx.lineWidth = 1;
+                        for (let i = 0; i < 3; i++) {
+                            const flagellaAngle = this.angle + Math.PI + (i - 1) * 0.3;
+                            const flagellaLength = 8 + Math.sin(Date.now() * 0.01 + i) * 2;
+                            ctx.beginPath();
+                            ctx.moveTo(this.x, this.y);
+                            ctx.lineTo(
+                                this.x + Math.cos(flagellaAngle) * flagellaLength,
+                                this.y + Math.sin(flagellaAngle) * flagellaLength
+                            );
+                            ctx.stroke();
+                        }
+                    }
+                    
+                    if (this.state === 'run' && !hasReachedFood) {
+                        ctx.strokeStyle = '#ffffff';
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        ctx.moveTo(this.x, this.y);
+                        ctx.lineTo(
+                            this.x + Math.cos(this.angle) * 12,
+                            this.y + Math.sin(this.angle) * 12
+                        );
+                        ctx.stroke();
+                    }
+                }
+            }
+            
+            class FoodSource {
+                constructor(x, y) {
+                    this.x = x;
+                    this.y = y;
+                }
+                
+                draw() {
+                    const maxDist = Math.sqrt(canvas.width ** 2 + canvas.height ** 2);
+                    const gradient = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, maxDist);
+                    gradient.addColorStop(0, 'rgba(68, 255, 68, 0.3)');
+                    gradient.addColorStop(0.3, 'rgba(68, 255, 68, 0.15)');
+                    gradient.addColorStop(0.6, 'rgba(68, 255, 68, 0.05)');
+                    gradient.addColorStop(1, 'rgba(68, 255, 68, 0)');
+                    
+                    ctx.fillStyle = gradient;
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    
+                    ctx.fillStyle = '#ffff44';
+                    ctx.strokeStyle = '#ffcc00';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, 12, 0, 2 * Math.PI);
+                    ctx.fill();
+                    ctx.stroke();
+                }
+            }
+            
+            function drawTrail() {
+                if (trail.length < 2) return;
+                
+                ctx.strokeStyle = '#ff4444';
+                ctx.lineWidth = 2;
+                ctx.lineCap = 'round';
+                
+                for (let i = 1; i < trail.length; i++) {
+                    const alpha = i / trail.length * 0.8;
+                    ctx.strokeStyle = `rgba(255, 68, 68, ${alpha})`;
+                    ctx.beginPath();
+                    ctx.moveTo(trail[i-1].x, trail[i-1].y);
+                    ctx.lineTo(trail[i].x, trail[i].y);
+                    ctx.stroke();
+                }
+            }
+            
+            function initSimulation() {
+                bacterium = new Bacterium(50, 50);
+                foodSource = new FoodSource(canvas.width - 100, canvas.height - 100);
+                trail = [];
+                hasReachedFood = false;
+            }
+            
+            function animate() {
+                ctx.fillStyle = 'rgba(0, 17, 34, 0.05)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                foodSource.draw();
+                drawTrail();
+                bacterium.update();
+                bacterium.draw();
+                
+                if (hasReachedFood) {
+                    ctx.fillStyle = '#00ff44';
+                    ctx.font = '20px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('Food Source Reached!', canvas.width / 2, 30);
+                }
+                
+                requestAnimationFrame(animate);
+            }
+            
+            function resetSimulation() {
+                initSimulation();
+            }
+            
+            initSimulation();
+            animate();
+        </script>
+    </body>
+    </html>
     """
+    
+    # Display the HTML component in Streamlit
+    components.html(html_code, height=700)
 
-    # Instead of a CSV on disk, you could read from an HTTP endpoint here too.
-    DATA_FILENAME = Path(__file__).parent/'data/gdp_data.csv'
-    raw_gdp_df = pd.read_csv(DATA_FILENAME)
+# Example usage in your Streamlit app
+def main():
+    st.set_page_config(page_title="Bacterial Motion", layout="wide")
+    
+    st.title("🦠 Bacterial Chemotaxis Simulation")
+    
+    st.markdown("""
+    This simulation demonstrates how bacteria use **run and tumble motion** to navigate toward food sources.
+    The bacterium alternates between straight runs and random tumbles, with longer runs when moving up
+    the chemical concentration gradient.
+    """)
+    
+    # Display the animation
+    bacteria_animation()
+    
+    st.markdown("""
+    ### How it works:
+    - **Blue bacterium**: Changes between running (with direction arrow) and tumbling states
+    - **Red trail**: Shows the path taken by the bacterium
+    - **Green gradient**: Chemical concentration field from the food source
+    - **Yellow circle**: Food source target
+    
+    The bacterium uses chemotaxis - it runs longer when detecting increasing concentrations
+    and tumbles more frequently when concentrations decrease, gradually biasing its movement toward food.
+    """)
 
-    MIN_YEAR = 1960
-    MAX_YEAR = 2022
-
-    # The data above has columns like:
-    # - Country Name
-    # - Country Code
-    # - [Stuff I don't care about]
-    # - GDP for 1960
-    # - GDP for 1961
-    # - GDP for 1962
-    # - ...
-    # - GDP for 2022
-    #
-    # ...but I want this instead:
-    # - Country Name
-    # - Country Code
-    # - Year
-    # - GDP
-    #
-    # So let's pivot all those year-columns into two: Year and GDP
-    gdp_df = raw_gdp_df.melt(
-        ['Country Code'],
-        [str(x) for x in range(MIN_YEAR, MAX_YEAR + 1)],
-        'Year',
-        'GDP',
-    )
-
-    # Convert years from string to integers
-    gdp_df['Year'] = pd.to_numeric(gdp_df['Year'])
-
-    return gdp_df
-
-gdp_df = get_gdp_data()
-
-# -----------------------------------------------------------------------------
-# Draw the actual page
-
-# Set the title that appears at the top of the page.
-'''
-# :earth_americas: GDP dashboard
-
-Browse GDP data from the [World Bank Open Data](https://data.worldbank.org/) website. As you'll
-notice, the data only goes to 2022 right now, and datapoints for certain years are often missing.
-But it's otherwise a great (and did I mention _free_?) source of data.
-'''
-
-# Add some spacing
-''
-''
-
-min_value = gdp_df['Year'].min()
-max_value = gdp_df['Year'].max()
-
-from_year, to_year = st.slider(
-    'Which years are you interested in?',
-    min_value=min_value,
-    max_value=max_value,
-    value=[min_value, max_value])
-
-countries = gdp_df['Country Code'].unique()
-
-if not len(countries):
-    st.warning("Select at least one country")
-
-selected_countries = st.multiselect(
-    'Which countries would you like to view?',
-    countries,
-    ['DEU', 'FRA', 'GBR', 'BRA', 'MEX', 'JPN'])
-
-''
-''
-''
-
-# Filter the data
-filtered_gdp_df = gdp_df[
-    (gdp_df['Country Code'].isin(selected_countries))
-    & (gdp_df['Year'] <= to_year)
-    & (from_year <= gdp_df['Year'])
-]
-
-st.header('GDP over time', divider='gray')
-
-''
-
-st.line_chart(
-    filtered_gdp_df,
-    x='Year',
-    y='GDP',
-    color='Country Code',
-)
-
-''
-''
-
-
-first_year = gdp_df[gdp_df['Year'] == from_year]
-last_year = gdp_df[gdp_df['Year'] == to_year]
-
-st.header(f'GDP in {to_year}', divider='gray')
-
-''
-
-cols = st.columns(4)
-
-for i, country in enumerate(selected_countries):
-    col = cols[i % len(cols)]
-
-    with col:
-        first_gdp = first_year[first_year['Country Code'] == country]['GDP'].iat[0] / 1000000000
-        last_gdp = last_year[last_year['Country Code'] == country]['GDP'].iat[0] / 1000000000
-
-        if math.isnan(first_gdp):
-            growth = 'n/a'
-            delta_color = 'off'
-        else:
-            growth = f'{last_gdp / first_gdp:,.2f}x'
-            delta_color = 'normal'
-
-        st.metric(
-            label=f'{country} GDP',
-            value=f'{last_gdp:,.0f}B',
-            delta=growth,
-            delta_color=delta_color
-        )
+if __name__ == "__main__":
+    main()
