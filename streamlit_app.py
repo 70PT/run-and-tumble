@@ -1,3 +1,15 @@
+import streamlit as st
+import streamlit.components.v1 as components
+
+# Set page config
+st.set_page_config(page_title="Bacterial Run and Tumble Motion", layout="wide")
+
+# Page header
+st.title("Bacterial Run and Tumble Motion Simulation")
+st.markdown("Watch a single bacterium navigate toward food using run and tumble motion.")
+
+# HTML code for the simulation
+html_code = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -18,7 +30,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            height: 100vh;
+            height: 90vh;
         }
         
         .title {
@@ -102,7 +114,7 @@
             It leaves a red trail as it alternates between straight runs and random tumbles until reaching the food source.
         </p>
         
-        <canvas id="canvas" width="800" height="500"></canvas>
+        <canvas id="canvas" width="700" height="400"></canvas>
         
         <div class="controls">
             <button id="startBtn" onclick="startSimulation()">Start</button>
@@ -156,10 +168,8 @@
             update() {
                 if (hasReachedFood || !isRunning) return;
                 
-                // Add current position to trail
                 trail.push({x: this.x, y: this.y, time: Date.now()});
                 
-                // Check if reached food source
                 const distToFood = Math.sqrt((this.x - foodSource.x) ** 2 + (this.y - foodSource.y) ** 2);
                 if (distToFood < 15) {
                     hasReachedFood = true;
@@ -170,18 +180,16 @@
                 const currentConcentration = this.getFoodConcentration();
                 
                 if (this.state === 'run') {
-                    // Move in current direction
                     this.x += Math.cos(this.angle) * this.speed;
                     this.y += Math.sin(this.angle) * this.speed;
                     
                     this.runTime++;
                     
-                    // Chemotaxis: run longer when going up gradient (increased bias)
                     let runProbability = 0.95;
                     if (currentConcentration > this.lastConcentration) {
-                        runProbability = 0.999; // Much longer runs up gradient
+                        runProbability = 0.999;
                     } else if (currentConcentration < this.lastConcentration) {
-                        runProbability = 0.85; // Much more frequent tumbles down gradient
+                        runProbability = 0.85;
                     }
                     
                     if (this.runTime > this.runDuration || Math.random() > runProbability) {
@@ -190,7 +198,6 @@
                         this.tumbleDuration = 5 + Math.random() * 10;
                     }
                 } else {
-                    // Tumbling - random direction changes
                     this.angle += (Math.random() - 0.5) * 0.8;
                     this.tumbleTime++;
                     
@@ -203,7 +210,6 @@
                 
                 this.lastConcentration = currentConcentration;
                 
-                // Bounce off walls
                 if (this.x < 10 || this.x > canvas.width - 10 || this.y < 10 || this.y > canvas.height - 10) {
                     this.angle += Math.PI + (Math.random() - 0.5) * 0.5;
                     this.x = Math.max(10, Math.min(canvas.width - 10, this.x));
@@ -217,9 +223,8 @@
             }
             
             draw() {
-                // Draw bacterium
                 if (hasReachedFood) {
-                    ctx.fillStyle = '#00ff44'; // Green when reached food
+                    ctx.fillStyle = '#00ff44';
                 } else {
                     ctx.fillStyle = this.state === 'run' ? '#4444ff' : '#6666ff';
                 }
@@ -228,7 +233,6 @@
                 ctx.ellipse(this.x, this.y, this.size, this.size * 1.5, this.angle, 0, 2 * Math.PI);
                 ctx.fill();
                 
-                // Draw flagella
                 if (!hasReachedFood) {
                     ctx.strokeStyle = this.state === 'tumble' ? '#8888ff' : '#6666ff';
                     ctx.lineWidth = 1;
@@ -245,7 +249,6 @@
                     }
                 }
                 
-                // Direction indicator during runs
                 if (this.state === 'run' && !hasReachedFood && isRunning) {
                     ctx.strokeStyle = '#ffffff';
                     ctx.lineWidth = 2;
@@ -267,7 +270,6 @@
             }
             
             draw() {
-                // Draw concentration gradient covering entire screen
                 const maxDist = Math.sqrt(canvas.width ** 2 + canvas.height ** 2);
                 const gradient = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, maxDist);
                 gradient.addColorStop(0, 'rgba(68, 255, 68, 0.3)');
@@ -278,7 +280,6 @@
                 ctx.fillStyle = gradient;
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
                 
-                // Draw food source
                 ctx.fillStyle = '#ffff44';
                 ctx.strokeStyle = '#ffcc00';
                 ctx.lineWidth = 2;
@@ -296,7 +297,6 @@
             ctx.lineWidth = 2;
             ctx.lineCap = 'round';
             
-            // Draw trail with fading effect
             for (let i = 1; i < trail.length; i++) {
                 const alpha = i / trail.length * 0.8;
                 ctx.strokeStyle = `rgba(255, 68, 68, ${alpha})`;
@@ -336,31 +336,23 @@
         }
         
         function animate() {
-            // Clear canvas
             ctx.fillStyle = 'rgba(0, 17, 34, 0.05)';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
-            // Draw food source
             foodSource.draw();
-            
-            // Draw trail
             drawTrail();
-            
-            // Update and draw bacterium
             bacterium.update();
             bacterium.draw();
             
-            // Show completion message with time
             if (hasReachedFood && startTime && endTime) {
                 const elapsedTime = endTime - startTime;
                 const timeString = formatTime(elapsedTime);
                 
                 ctx.fillStyle = '#00ff44';
-                ctx.font = '20px Arial';
+                ctx.font = '18px Arial';
                 ctx.textAlign = 'center';
                 ctx.fillText(`Food Source Reached! It took your bacteria ${timeString}`, canvas.width / 2, 30);
             } else if (!isRunning && !hasReachedFood) {
-                // Show start message
                 ctx.fillStyle = '#ffffff';
                 ctx.font = '16px Arial';
                 ctx.textAlign = 'center';
@@ -374,9 +366,26 @@
             initSimulation();
         }
         
-        // Initialize and start
         initSimulation();
         animate();
     </script>
 </body>
 </html>
+"""
+
+# Display the HTML simulation
+components.html(html_code, height=600)
+
+# Add some additional information below
+st.markdown("---")
+st.markdown("## About the Simulation")
+st.markdown("""
+This simulation demonstrates bacterial chemotaxis using the "run and tumble" mechanism:
+
+- **Run Phase**: The bacterium moves in a straight line
+- **Tumble Phase**: The bacterium randomly reorients its direction
+- **Chemotaxis**: The bacterium tends to run longer when moving up a chemical gradient (toward food)
+- **Trail**: The red trail shows the path taken by the bacterium
+
+The bacterium uses this simple mechanism to navigate toward the food source without any complex navigation system!
+""")
