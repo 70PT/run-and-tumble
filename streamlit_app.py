@@ -1,391 +1,257 @@
 import streamlit as st
-import streamlit.components.v1 as components
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+import ast
+import numpy as np
 
-# Set page config
-st.set_page_config(page_title="Bacterial Run and Tumble Motion", layout="wide")
+# Set page configuration
+st.set_page_config(page_title="Cell Growth Analysis", layout="wide")
 
-# Page header
-st.title("Bacterial Run and Tumble Motion Simulation")
-st.markdown("Watch a single bacterium navigate toward food using run and tumble motion.")
+st.title("📊 Cell Growth Analysis Dashboard")
+st.markdown("Upload your processed data CSV to visualize morphology, growth rates, precipitation, and growth curves interactively.")
 
-# HTML code for the simulation
-html_code = """
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bacterial Run and Tumble Motion</title>
-    <style>
-        body {
-            margin: 0;
-            padding: 20px;
-            background: linear-gradient(135deg, #0f0f23, #1a1a3a);
-            color: white;
-            font-family: 'Arial', sans-serif;
-            overflow: hidden;
-        }
-        
-        .container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            height: 90vh;
-        }
-        
-        .title {
-            font-size: 24px;
-            font-weight: bold;
-            margin-bottom: 10px;
-            background: linear-gradient(45deg, #00ff88, #00ccff);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            text-align: center;
-        }
-        
-        .description {
-            font-size: 14px;
-            margin-bottom: 20px;
-            text-align: center;
-            opacity: 0.8;
-            max-width: 600px;
-        }
-        
-        canvas {
-            border: 2px solid #333;
-            border-radius: 10px;
-            background: radial-gradient(circle at center, #001122, #000000);
-            box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
-        }
-        
-        .controls {
-            margin-top: 15px;
-            display: flex;
-            gap: 15px;
-            align-items: center;
-        }
-        
-        button {
-            padding: 8px 16px;
-            background: linear-gradient(45deg, #00ff88, #00ccff);
-            border: none;
-            border-radius: 5px;
-            color: #000;
-            font-weight: bold;
-            cursor: pointer;
-            transition: transform 0.2s;
-        }
-        
-        button:hover {
-            transform: scale(1.05);
-        }
-        
-        button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
-        }
-        
-        .legend {
-            margin-top: 15px;
-            display: flex;
-            gap: 20px;
-            font-size: 12px;
-        }
-        
-        .legend-item {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-        
-        .legend-color {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1 class="title">Bacterial Run and Tumble Motion</h1>
-        <p class="description">
-            Watch a single bacterium navigate toward food using run and tumble motion. 
-            It leaves a red trail as it alternates between straight runs and random tumbles until reaching the food source.
-        </p>
-        
-        <canvas id="canvas" width="700" height="400"></canvas>
-        
-        <div class="controls">
-            <button id="startBtn" onclick="startSimulation()">Start</button>
-            <button onclick="resetSimulation()">Reset</button>
-        </div>
-        
-        <div class="legend">
-            <div class="legend-item">
-                <div class="legend-color" style="background: #4444ff;"></div>
-                <span>Bacterium</span>
-            </div>
-            <div class="legend-item">
-                <div class="legend-color" style="background: #ffff44;"></div>
-                <span>Food Source</span>
-            </div>
-            <div class="legend-item">
-                <div class="legend-color" style="background: #ff4444;"></div>
-                <span>Trail</span>
-            </div>
-        </div>
-    </div>
+# ---------------------------------------------------------
+# 1. FILE UPLOAD
+# ---------------------------------------------------------
+uploaded_file = st.file_uploader("Upload CSV File", type=["csv"])
 
-    <script>
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-        const startBtn = document.getElementById('startBtn');
+if uploaded_file is not None:
+    try:
+        # Load data
+        df = pd.read_csv(uploaded_file)
         
-        let bacterium;
-        let foodSource;
-        let trail = [];
-        let isRunning = false;
-        let hasReachedFood = false;
-        let startTime = null;
-        let endTime = null;
-        
-        class Bacterium {
-            constructor(x, y) {
-                this.x = x;
-                this.y = y;
-                this.angle = Math.random() * 2 * Math.PI;
-                this.speed = 2;
-                this.state = 'run';
-                this.runTime = 0;
-                this.tumbleTime = 0;
-                this.runDuration = 30 + Math.random() * 40;
-                this.tumbleDuration = 5 + Math.random() * 10;
-                this.lastConcentration = 0;
-                this.size = 4;
-            }
+        # ---------------------------------------------------------
+        # 2. DATA PREPROCESSING
+        # ---------------------------------------------------------
+        with st.spinner("Processing data..."):
+            # List of columns that need parsing from string to list
+            list_cols = ['Time after seeding', 'Cell count', 'Morphology', 'Precipitation']
             
-            update() {
-                if (hasReachedFood || !isRunning) return;
-                
-                trail.push({x: this.x, y: this.y, time: Date.now()});
-                
-                const distToFood = Math.sqrt((this.x - foodSource.x) ** 2 + (this.y - foodSource.y) ** 2);
-                if (distToFood < 15) {
-                    hasReachedFood = true;
-                    endTime = Date.now();
-                    return;
-                }
-                
-                const currentConcentration = this.getFoodConcentration();
-                
-                if (this.state === 'run') {
-                    this.x += Math.cos(this.angle) * this.speed;
-                    this.y += Math.sin(this.angle) * this.speed;
-                    
-                    this.runTime++;
-                    
-                    let runProbability = 0.95;
-                    if (currentConcentration > this.lastConcentration) {
-                        runProbability = 0.999;
-                    } else if (currentConcentration < this.lastConcentration) {
-                        runProbability = 0.85;
-                    }
-                    
-                    if (this.runTime > this.runDuration || Math.random() > runProbability) {
-                        this.state = 'tumble';
-                        this.runTime = 0;
-                        this.tumbleDuration = 5 + Math.random() * 10;
-                    }
-                } else {
-                    this.angle += (Math.random() - 0.5) * 0.8;
-                    this.tumbleTime++;
-                    
-                    if (this.tumbleTime > this.tumbleDuration) {
-                        this.state = 'run';
-                        this.tumbleTime = 0;
-                        this.runDuration = 30 + Math.random() * 40;
-                    }
-                }
-                
-                this.lastConcentration = currentConcentration;
-                
-                if (this.x < 10 || this.x > canvas.width - 10 || this.y < 10 || this.y > canvas.height - 10) {
-                    this.angle += Math.PI + (Math.random() - 0.5) * 0.5;
-                    this.x = Math.max(10, Math.min(canvas.width - 10, this.x));
-                    this.y = Math.max(10, Math.min(canvas.height - 10, this.y));
-                }
-            }
-            
-            getFoodConcentration() {
-                const dist = Math.sqrt((this.x - foodSource.x) ** 2 + (this.y - foodSource.y) ** 2);
-                return 100 / (1 + dist * 0.01);
-            }
-            
-            draw() {
-                if (hasReachedFood) {
-                    ctx.fillStyle = '#00ff44';
-                } else {
-                    ctx.fillStyle = this.state === 'run' ? '#4444ff' : '#6666ff';
-                }
-                
-                ctx.beginPath();
-                ctx.ellipse(this.x, this.y, this.size, this.size * 1.5, this.angle, 0, 2 * Math.PI);
-                ctx.fill();
-                
-                if (!hasReachedFood) {
-                    ctx.strokeStyle = this.state === 'tumble' ? '#8888ff' : '#6666ff';
-                    ctx.lineWidth = 1;
-                    for (let i = 0; i < 3; i++) {
-                        const flagellaAngle = this.angle + Math.PI + (i - 1) * 0.3;
-                        const flagellaLength = 8 + Math.sin(Date.now() * 0.01 + i) * 2;
-                        ctx.beginPath();
-                        ctx.moveTo(this.x, this.y);
-                        ctx.lineTo(
-                            this.x + Math.cos(flagellaAngle) * flagellaLength,
-                            this.y + Math.sin(flagellaAngle) * flagellaLength
-                        );
-                        ctx.stroke();
-                    }
-                }
-                
-                if (this.state === 'run' && !hasReachedFood && isRunning) {
-                    ctx.strokeStyle = '#ffffff';
-                    ctx.lineWidth = 2;
-                    ctx.beginPath();
-                    ctx.moveTo(this.x, this.y);
-                    ctx.lineTo(
-                        this.x + Math.cos(this.angle) * 12,
-                        this.y + Math.sin(this.angle) * 12
-                    );
-                    ctx.stroke();
-                }
-            }
-        }
-        
-        class FoodSource {
-            constructor(x, y) {
-                this.x = x;
-                this.y = y;
-            }
-            
-            draw() {
-                const maxDist = Math.sqrt(canvas.width ** 2 + canvas.height ** 2);
-                const gradient = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, maxDist);
-                gradient.addColorStop(0, 'rgba(68, 255, 68, 0.3)');
-                gradient.addColorStop(0.3, 'rgba(68, 255, 68, 0.15)');
-                gradient.addColorStop(0.6, 'rgba(68, 255, 68, 0.05)');
-                gradient.addColorStop(1, 'rgba(68, 255, 68, 0)');
-                
-                ctx.fillStyle = gradient;
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                
-                ctx.fillStyle = '#ffff44';
-                ctx.strokeStyle = '#ffcc00';
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, 12, 0, 2 * Math.PI);
-                ctx.fill();
-                ctx.stroke();
-            }
-        }
-        
-        function drawTrail() {
-            if (trail.length < 2) return;
-            
-            ctx.strokeStyle = '#ff4444';
-            ctx.lineWidth = 2;
-            ctx.lineCap = 'round';
-            
-            for (let i = 1; i < trail.length; i++) {
-                const alpha = i / trail.length * 0.8;
-                ctx.strokeStyle = `rgba(255, 68, 68, ${alpha})`;
-                ctx.beginPath();
-                ctx.moveTo(trail[i-1].x, trail[i-1].y);
-                ctx.lineTo(trail[i].x, trail[i].y);
-                ctx.stroke();
-            }
-        }
-        
-        function formatTime(milliseconds) {
-            const totalSeconds = Math.floor(milliseconds / 1000);
-            const minutes = Math.floor(totalSeconds / 60);
-            const seconds = totalSeconds % 60;
-            return `${minutes} min${minutes !== 1 ? 's' : ''} and ${seconds} second${seconds !== 1 ? 's' : ''}`;
-        }
-        
-        function initSimulation() {
-            bacterium = new Bacterium(50, 50);
-            foodSource = new FoodSource(canvas.width - 100, canvas.height - 100);
-            trail = [];
-            hasReachedFood = false;
-            isRunning = false;
-            startTime = null;
-            endTime = null;
-            startBtn.textContent = 'Start';
-            startBtn.disabled = false;
-        }
-        
-        function startSimulation() {
-            if (!isRunning && !hasReachedFood) {
-                isRunning = true;
-                startTime = Date.now();
-                startBtn.textContent = 'Running...';
-                startBtn.disabled = true;
-            }
-        }
-        
-        function animate() {
-            ctx.fillStyle = 'rgba(0, 17, 34, 0.05)';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            foodSource.draw();
-            drawTrail();
-            bacterium.update();
-            bacterium.draw();
-            
-            if (hasReachedFood && startTime && endTime) {
-                const elapsedTime = endTime - startTime;
-                const timeString = formatTime(elapsedTime);
-                
-                ctx.fillStyle = '#00ff44';
-                ctx.font = '18px Arial';
-                ctx.textAlign = 'center';
-                ctx.fillText(`Food Source Reached! It took your bacteria ${timeString}`, canvas.width / 2, 30);
-            } else if (!isRunning && !hasReachedFood) {
-                ctx.fillStyle = '#ffffff';
-                ctx.font = '16px Arial';
-                ctx.textAlign = 'center';
-                ctx.fillText('Click Start to begin the bacterial journey!', canvas.width / 2, 30);
-            }
-            
-            requestAnimationFrame(animate);
-        }
-        
-        function resetSimulation() {
-            initSimulation();
-        }
-        
-        initSimulation();
-        animate();
-    </script>
-</body>
-</html>
-"""
+            # Parse list columns safely
+            for col in list_cols:
+                if col in df.columns and isinstance(df[col].iloc[0], str):
+                    df[col] = df[col].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
 
-# Display the HTML simulation
-components.html(html_code, height=600)
+            # --- TRUNCATION LOGIC ---
+            # 1. Ensure intra-row consistency: Truncate lists within a row to the shortest list length in that row
+            def truncate_row_lists(row):
+                # Find min length among the 4 list columns
+                lengths = [len(row[col]) for col in list_cols if isinstance(row[col], list)]
+                if not lengths: return row
+                min_len = min(lengths)
+                
+                # Truncate each list to min_len
+                for col in list_cols:
+                    if isinstance(row[col], list):
+                        row[col] = row[col][:min_len]
+                return row
 
-# Add some additional information below
-st.markdown("---")
-st.markdown("## About the Simulation")
-st.markdown("""
-This simulation demonstrates bacterial chemotaxis using the "run and tumble" mechanism:
+            df = df.apply(truncate_row_lists, axis=1)
 
-- **Run Phase**: The bacterium moves in a straight line
-- **Tumble Phase**: The bacterium randomly reorients its direction
-- **Chemotaxis**: The bacterium tends to run longer when moving up a chemical gradient (toward food)
-- **Trail**: The red trail shows the path taken by the bacterium
+            # 2. Ensure intra-condition consistency: Truncate all replicates in a condition to the shortest length
+            # This prevents "tails" where only 1 replicate exists from skewing the average.
+            
+            # We need to reconstruct the dataframe with truncated lists
+            truncated_rows = []
+            
+            for condition, group in df.groupby('Condition'):
+                # Find the minimum number of timepoints across all replicates for this condition
+                # We assume 'Time after seeding' is the reference for length
+                min_points = group['Time after seeding'].apply(len).min()
+                
+                for _, row in group.iterrows():
+                    # Truncate all list columns to this minimum length
+                    for col in list_cols:
+                        if isinstance(row[col], list):
+                            row[col] = row[col][:min_points]
+                    truncated_rows.append(row)
+            
+            df = pd.DataFrame(truncated_rows)
 
-The bacterium uses this simple mechanism to navigate toward the food source without any complex navigation system!
-""")
+            # --- CREATE LONG DATAFRAME ---
+            # "Explode" the lists so we have one row per time point per replicate
+            temp_data = {
+                'Condition': [], 
+                'Time': [], 
+                'Cell Count': [],
+                'Morphology': [],
+                'Precipitation': []
+            }
+            
+            for index, row in df.iterrows():
+                cond = row['Condition']
+                # Since we synchronized lengths above, we can zip safely
+                times = row['Time after seeding']
+                counts = row['Cell count']
+                morphs = row['Morphology']
+                precips = row['Precipitation']
+                
+                num_points = len(times)
+                
+                temp_data['Condition'].extend([cond] * num_points)
+                temp_data['Time'].extend(times)
+                temp_data['Cell Count'].extend(counts)
+                temp_data['Morphology'].extend(morphs)
+                temp_data['Precipitation'].extend(precips)
+            
+            df_long = pd.DataFrame(temp_data)
+            
+            # Round Time to group nearby timepoints (anchoring them to a common integer/half-integer)
+            df_long['Time_Rounded'] = df_long['Time'].round(0)
+
+        # ---------------------------------------------------------
+        # 3. SIDEBAR - GLOBAL FILTERS
+        # ---------------------------------------------------------
+        st.sidebar.header("Visualization Settings")
+        
+        all_conditions = sorted(df['Condition'].unique())
+        
+        # Multiselect widget
+        selected_conditions = st.sidebar.multiselect(
+            "Select Conditions to Visualize:",
+            options=all_conditions,
+            default=all_conditions[:min(5, len(all_conditions))]
+        )
+        
+        if not selected_conditions:
+            st.warning("Please select at least one condition in the sidebar to view the plots.")
+            st.stop()
+
+        # Filter data based on selection
+        filtered_df = df[df['Condition'].isin(selected_conditions)]
+        filtered_df_long = df_long[df_long['Condition'].isin(selected_conditions)]
+
+        # ---------------------------------------------------------
+        # 4. AGGREGATION
+        # ---------------------------------------------------------
+        # A. Stats for Bar Charts
+        bar_stats = filtered_df.groupby('Condition')[['Average morphology', 'Growth rate (k)', 'Average precipitation']].agg(['mean', 'std']).reset_index()
+        bar_stats.columns = ['Condition', 'Morphology_Mean', 'Morphology_Std', 
+                             'GrowthRate_Mean', 'GrowthRate_Std', 
+                             'Precipitation_Mean', 'Precipitation_Std']
+
+        # B. Stats for Curves (Mean + Std per Condition per Timepoint)
+        curve_stats = filtered_df_long.groupby(['Condition', 'Time_Rounded'])[['Cell Count', 'Morphology', 'Precipitation']].agg(['mean', 'std']).reset_index()
+
+        # ---------------------------------------------------------
+        # 5. PLOTTING FUNCTION
+        # ---------------------------------------------------------
+        # Helper to create standard curve plots with shaded error bars
+        def create_curve_plot(stats_df, y_col_mean, y_col_std, y_label, title):
+            fig = go.Figure()
+            palette = px.colors.qualitative.Plotly
+            
+            # Ensure we iterate in the same order as the bar charts if possible, or just unique conditions
+            conditions = sorted(stats_df['Condition'].unique())
+            
+            for idx, condition in enumerate(conditions):
+                cond_data = stats_df[stats_df['Condition'] == condition].sort_values('Time_Rounded')
+                if cond_data.empty: continue
+
+                x = cond_data['Time_Rounded']
+                y = cond_data[y_col_mean]
+                std = cond_data[y_col_std].fillna(0)
+                y_upper = y + std
+                y_lower = y - std
+                
+                color = palette[idx % len(palette)]
+                
+                # Shaded Area (Std Dev)
+                fig.add_trace(go.Scatter(
+                    x=pd.concat([x, x[::-1]]),
+                    y=pd.concat([y_upper, y_lower[::-1]]),
+                    fill='toself',
+                    fillcolor=color,
+                    opacity=0.15,
+                    line=dict(color='rgba(255,255,255,0)'),
+                    hoverinfo="skip",
+                    showlegend=False,
+                    name=f"{condition} Std"
+                ))
+
+                # Main Line
+                fig.add_trace(go.Scatter(
+                    x=x, y=y,
+                    mode='lines+markers',
+                    name=condition,
+                    line=dict(color=color, width=2),
+                    marker=dict(size=5)
+                ))
+
+            fig.update_layout(
+                title=title,
+                xaxis_title="Time after seeding (Hours)",
+                yaxis_title=y_label,
+                template="plotly_white",
+                hovermode="x unified",
+                legend=dict(title="Condition")
+            )
+            return fig
+
+        # ---------------------------------------------------------
+        # 6. DISPLAY PLOTS
+        # ---------------------------------------------------------
+        
+        # --- ROW 1: BAR CHARTS ---
+        st.subheader("Summary Statistics")
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            fig_morph = px.bar(bar_stats, x='Condition', y='Morphology_Mean', error_y='Morphology_Std', 
+                               color='Condition', title="Avg Morphology", template="plotly_white")
+            fig_morph.update_layout(showlegend=False, xaxis_title=None)
+            st.plotly_chart(fig_morph, use_container_width=True)
+
+        with col2:
+            fig_growth = px.bar(bar_stats, x='Condition', y='GrowthRate_Mean', error_y='GrowthRate_Std', 
+                                color='Condition', title="Avg Growth Rate (k)", template="plotly_white")
+            fig_growth.update_layout(showlegend=False, xaxis_title=None)
+            st.plotly_chart(fig_growth, use_container_width=True)
+
+        with col3:
+            fig_precip = px.bar(bar_stats, x='Condition', y='Precipitation_Mean', error_y='Precipitation_Std', 
+                                color='Condition', title="Avg Precipitation", template="plotly_white")
+            fig_precip.update_layout(showlegend=False, xaxis_title=None)
+            st.plotly_chart(fig_precip, use_container_width=True)
+
+        # --- ROW 2: CURVES ---
+        st.subheader("Time-Course Curves")
+        
+        tab1, tab2, tab3 = st.tabs(["Cell Growth", "Morphology", "Precipitation"])
+
+        with tab1:
+            fig_growth_curve = create_curve_plot(
+                curve_stats, 
+                ('Cell Count', 'mean'), 
+                ('Cell Count', 'std'), 
+                "Cell Count", 
+                "Cell Growth Over Time"
+            )
+            st.plotly_chart(fig_growth_curve, use_container_width=True)
+
+        with tab2:
+            fig_morph_curve = create_curve_plot(
+                curve_stats, 
+                ('Morphology', 'mean'), 
+                ('Morphology', 'std'), 
+                "Morphology Score", 
+                "Morphology Over Time"
+            )
+            st.plotly_chart(fig_morph_curve, use_container_width=True)
+
+        with tab3:
+            fig_precip_curve = create_curve_plot(
+                curve_stats, 
+                ('Precipitation', 'mean'), 
+                ('Precipitation', 'std'), 
+                "Precipitation", 
+                "Precipitation Over Time"
+            )
+            st.plotly_chart(fig_precip_curve, use_container_width=True)
+
+    except Exception as e:
+        st.error(f"An error occurred: {e}")
+        st.write("Debug Info:", e)
+else:
+    st.info("Awaiting CSV file upload. Please upload the 'Processed Data' file.")
