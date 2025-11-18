@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
+# import st.plotly.express as px
+# import st.plotly.graph_objects as go
 import ast
 import numpy as np
 
@@ -140,7 +140,7 @@ if uploaded_file is not None:
         # Helper to create standard curve plots with shaded error bars
         def create_curve_plot(stats_df, y_col_mean, y_col_std, y_label, title):
             fig = go.Figure()
-            palette = px.colors.qualitative.Plotly
+            palette = px.colors.qualitative.st.plotly
             
             # Ensure we iterate in the same order as the bar charts if possible, or just unique conditions
             conditions = sorted(stats_df['Condition'].unique())
@@ -183,7 +183,7 @@ if uploaded_file is not None:
                 title=title,
                 xaxis_title="Time after seeding (Hours)",
                 yaxis_title=y_label,
-                template="plotly_white",
+                template="st.plotly_white",
                 hovermode="x unified",
                 legend=dict(title="Condition")
             )
@@ -199,19 +199,19 @@ if uploaded_file is not None:
 
         with col1:
             fig_morph = px.bar(bar_stats, x='Condition', y='Morphology_Mean', error_y='Morphology_Std', 
-                               color='Condition', title="Avg Morphology", template="plotly_white")
+                               color='Condition', title="Avg Morphology", template="st.plotly_white")
             fig_morph.update_layout(showlegend=False, xaxis_title=None)
             st.plotly_chart(fig_morph, use_container_width=True)
 
         with col2:
             fig_growth = px.bar(bar_stats, x='Condition', y='GrowthRate_Mean', error_y='GrowthRate_Std', 
-                                color='Condition', title="Avg Growth Rate (k)", template="plotly_white")
+                                color='Condition', title="Avg Growth Rate (k)", template="st.plotly_white")
             fig_growth.update_layout(showlegend=False, xaxis_title=None)
             st.plotly_chart(fig_growth, use_container_width=True)
 
         with col3:
             fig_precip = px.bar(bar_stats, x='Condition', y='Precipitation_Mean', error_y='Precipitation_Std', 
-                                color='Condition', title="Avg Precipitation", template="plotly_white")
+                                color='Condition', title="Avg Precipitation", template="st.plotly_white")
             fig_precip.update_layout(showlegend=False, xaxis_title=None)
             st.plotly_chart(fig_precip, use_container_width=True)
 
