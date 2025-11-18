@@ -52,12 +52,10 @@ if uploaded_file is not None:
             # 2. Ensure intra-condition consistency: Truncate all replicates in a condition to the shortest length
             # This prevents "tails" where only 1 replicate exists from skewing the average.
             
-            # We need to reconstruct the dataframe with truncated lists
             truncated_rows = []
             
             for condition, group in df.groupby('Condition'):
                 # Find the minimum number of timepoints across all replicates for this condition
-                # We assume 'Time after seeding' is the reference for length
                 min_points = group['Time after seeding'].apply(len).min()
                 
                 for _, row in group.iterrows():
@@ -81,7 +79,6 @@ if uploaded_file is not None:
             
             for index, row in df.iterrows():
                 cond = row['Condition']
-                # Since we synchronized lengths above, we can zip safely
                 times = row['Time after seeding']
                 counts = row['Cell count']
                 morphs = row['Morphology']
@@ -140,9 +137,8 @@ if uploaded_file is not None:
         # Helper to create standard curve plots with shaded error bars
         def create_curve_plot(stats_df, y_col_mean, y_col_std, y_label, title):
             fig = go.Figure()
-            palette = px.colors.qualitative.st.plotly
+            palette = px.colors.qualitative.Plotly
             
-            # Ensure we iterate in the same order as the bar charts if possible, or just unique conditions
             conditions = sorted(stats_df['Condition'].unique())
             
             for idx, condition in enumerate(conditions):
@@ -183,7 +179,7 @@ if uploaded_file is not None:
                 title=title,
                 xaxis_title="Time after seeding (Hours)",
                 yaxis_title=y_label,
-                template="st.plotly_white",
+                template="plotly_white",
                 hovermode="x unified",
                 legend=dict(title="Condition")
             )
@@ -199,19 +195,19 @@ if uploaded_file is not None:
 
         with col1:
             fig_morph = px.bar(bar_stats, x='Condition', y='Morphology_Mean', error_y='Morphology_Std', 
-                               color='Condition', title="Avg Morphology", template="st.plotly_white")
+                               color='Condition', title="Avg Morphology") # Removed template="plotly_white"
             fig_morph.update_layout(showlegend=False, xaxis_title=None)
             st.plotly_chart(fig_morph, use_container_width=True)
 
         with col2:
             fig_growth = px.bar(bar_stats, x='Condition', y='GrowthRate_Mean', error_y='GrowthRate_Std', 
-                                color='Condition', title="Avg Growth Rate (k)", template="st.plotly_white")
+                                color='Condition', title="Avg Growth Rate (k)") # Removed template="plotly_white"
             fig_growth.update_layout(showlegend=False, xaxis_title=None)
             st.plotly_chart(fig_growth, use_container_width=True)
 
         with col3:
             fig_precip = px.bar(bar_stats, x='Condition', y='Precipitation_Mean', error_y='Precipitation_Std', 
-                                color='Condition', title="Avg Precipitation", template="st.plotly_white")
+                                color='Condition', title="Avg Precipitation") # Removed template="plotly_white"
             fig_precip.update_layout(showlegend=False, xaxis_title=None)
             st.plotly_chart(fig_precip, use_container_width=True)
 
